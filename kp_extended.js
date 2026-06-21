@@ -66,25 +66,15 @@
             
             Lampa.Noty.show('🔌 Ищу «' + movieTitle + '» на Кинопоиске...');
 
-            // Используем стандартный fetch для максимальной совместимости и поддержки заголовков через прокси
             function sendCleanRequest(apiUrl, successCall) {
-                var proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(apiUrl);
-                
-                fetch(proxyUrl, {
-                    method: 'GET',
+                var network = new Lampa.Reguest();
+                network.silent(apiUrl, successCall, function () {
+                    console.log('KP API Error', apiUrl);
+                }, false, {
                     headers: {
                         'X-API-KEY': token,
                         'Content-Type': 'application/json'
                     }
-                })
-                .then(function (response) {
-                    return response.json();
-                })
-                .then(function (json) {
-                    if (json) successCall(json);
-                })
-                .catch(function (err) {
-                    console.log('KP API Error', err);
                 });
             }
 
@@ -95,7 +85,7 @@
                             '<div class="items-line__body">' +
                                 '<div class="scroll scroll--horizontal">' +
                                     '<div class="scroll__content"><div class="scroll__body full-reviews ' + id + '-items"></div></div>' +
-                                </div>' +
+                                '</div>' +
                             '</div>' +
                         '</div>';
                 
@@ -259,7 +249,7 @@
                 }
             }
 
-            // Текстовый поиск Кинопоиска (Защищено от CORS и работает для новинок 2026)
+            // Текстовый поиск Кинопоиска
             var kp_id = e.data.movie.kinopoisk_id || e.data.movie.kp_id || e.data.movie.id_kp;
             
             if (kp_id) {
@@ -279,7 +269,6 @@
         });
     }
 
-    // Возвращаем пуленепробиваемый метод ожидания полной готовности Lampa
     if (window.Lampa) {
         startPlugin();
     } else {
