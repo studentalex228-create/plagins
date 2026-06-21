@@ -4,14 +4,18 @@
     function startPlugin() {
         window.free_kp_extended_ready = true;
 
-        // Навешиваем слушатель строго по структуре rezkacomment.js
+        if (!document.getElementById('kp-extended-css')) {
+            var style = document.createElement('style');
+            style.id = 'kp-extended-css';
+            style.innerHTML = '.kp-spoiler { color: #ff5252; font-weight: bold; background: rgba(255,82,82,0.15); padding: 2px 6px; border-radius: 4px; margin-right: 6px; display: inline-block; }';
+            document.head.appendChild(style);
+        }
+
         Lampa.Listener.follow("full", function (e) {
             if (e.type !== "complite" || !e.data || !e.data.movie) return;
 
-            // Очищаем старую кнопку, если она была создана
             $(".button--kp-main-plus").remove();
 
-            // Создаем красивую кнопку "Кинопоиск+" рядом с "Смотреть" и "Трейлер"
             var btnHtml = '<div class="full-start__button selector button--kp-main-plus" style="background: rgba(255,102,0,0.15); border: 1px solid #f60; margin-right: 10px;"><span style="color:#f60; font-weight:bold;">✨ Кинопоиск+</span></div>';
             
             var btnContainer = $(".full-start-new__buttons").length ? $(".full-start-new__buttons") : $(".full-start__buttons");
@@ -19,11 +23,9 @@
                 btnContainer.append(btnHtml);
             }
 
-            // Логика нажатия на кнопку
             $(".button--kp-main-plus").on("hover:enter", function () {
                 var token = Lampa.Storage.get('kp_unofficial_token', '');
 
-                // 🔑 Если ключа нет — запрашиваем ввод
                 if (!token) {
                     Lampa.Input.edit({ title: 'Введи API Ключ Кинопоиска', value: '', free: true }, function (new_value) {
                         if (new_value && new_value.trim()) {
@@ -34,7 +36,6 @@
                     return;
                 }
 
-                // 🚀 Если ключ есть — запускаем поиск фильма
                 Lampa.Loading.start();
 
                 var movieTitle = e.data.movie.name || e.data.movie.title || e.data.movie.original_title || '';
@@ -47,23 +48,26 @@
                     Lampa.Loading.stop();
                     openMenu(kpid, token, movieTitle, movieYear);
                 } else {
-                    // Точный поиск без указания года в строке (чтобы избежать ошибок разницы баз)
                     var searchQuery = encodeURIComponent(movieTitle);
-                    fetch('https://kinopoiskapiunofficial.tech/api/v2.1/films/search-by-keyword?keyword=' + searchQuery, {
+                    // Используем современный высокоточный эндпоинт v2.2
+                    fetch('https://kinopoiskapiunofficial.tech/api/v2.2/films?keyword=' + searchQuery, {
                         method: 'GET',
                         headers: { 'X-API-KEY': token, 'Content-Type': 'application/json' }
                     })
                     .then(function(res) { return res.json(); })
                     .then(function(searchJson) {
                         Lampa.Loading.stop();
-                        if (searchJson && searchJson.films && searchJson.films.length > 0) {
-                            var bestMatch = searchJson.films[0].filmId;
-                            // Умная сверка годов для точного сопоставления новинок
+                        var items = searchJson.items || searchJson.films || [];
+                        if (items && items.length > 0) {
+                            var bestMatch = items[0].kinopoiskId || items[0].filmId;
+                            
+                            // УМНАЯ СВЕРКА ГОДОВ (Допуск +-1 год для новинок вроде Обсессии)
                             if (movieYear) {
-                                for (var f = 0; f < searchJson.films.length; f++) {
-                                    var fYear = '' + searchJson.films[f].year;
-                                    if (fYear && fYear.indexOf(movieYear) !== -1) {
-                                        bestMatch = searchJson.films[f].filmId;
+                                var targetYear = parseInt(movieYear, 10);
+                                for (var f = 0; f < items.length; f++) {
+                                    var kpYear = parseInt(items[f].year, 10);
+                                    if (!isNaN(kpYear) && Math.abs(kpYear - targetYear) <= 1) {
+                                        bestMatch = items[f].kinopoiskId || items[f].filmId;
                                         break;
                                     }
                                 }
@@ -82,7 +86,6 @@
         });
     }
 
-    // Главное меню выбора материалов
     function openMenu(kp_id, token, movieTitle, movieYear) {
         var items = [
             { title: '💡 Интересные факты', action: 'facts' },
@@ -122,6 +125,9 @@
                                 title: 'Похожие фильмы',
                                 items: simItems,
                                 onSelect: function(selectedSim) {
+                                    // ИСПРАВЛЕНО: Закрываем все слои меню перед переходом к поиску
+                                    Lampa.Select.close();
+                                    Lampa.Modal.close();
                                     Lampa.Activity.push({ component: 'search', query: selectedSim.query });
                                 },
                                 onBack: function() { openMenu(kp_id, token, movieTitle, movieYear); }
@@ -145,7 +151,6 @@
         });
     }
 
-    // Загрузка контента во всплывающее окно Lampa
     function loadDataAndShow(kp_id, token, action, menuTitle, movieTitle, movieYear) {
         var url = '';
         if (action === 'facts' || action === 'bloopers') url = 'v2.2/films/' + kp_id + '/facts';
@@ -171,7 +176,7 @@
                         if (json.items[i].type === typeFilter) {
                             count++;
                             var cleanText = json.items[i].text.replace(/<[^>]+>/g, '');
-                            var spoiler = json.items[i].spoiler ? '<span style="color:#ff5252; font-weight:bold; background:rgba(255,82,82,0.15); padding:2px 6px; border-radius:4px; margin-right:6px; display:inline-block;">СПОЙЛЕР</span>' : '';
+                            var spoiler = json.items[i].spoiler ? '<span class="kp-spoiler">СПОЙЛЕР</span>' : '';
                             html += '<div style="background:rgba(255,255,255,0.05); padding:12px; margin-bottom:12px; border-radius:10px; border:1px solid rgba(255,255,255,0.03);">' + spoiler + cleanText + '</div>';
                         }
                     }
