@@ -60,10 +60,11 @@
 
             var isTvShow = !!e.data.movie.name;
             var movieTitle = e.data.movie.name || e.data.movie.title || e.data.movie.original_title;
+            var movieYear = (e.data.movie.release_date || e.data.movie.first_air_date || '').split('-')[0];
             
             Lampa.Noty.show('🔌 Ищу «' + movieTitle + '» на Кинопоиске...');
 
-            // Функция для безопасных AJAX запросов через CORS-прокси
+            // Функция для безопасных запросов через CORS-прокси
             function apiRequest(url, successCallback, errorCallback) {
                 var proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(url);
                 $.ajax({
@@ -85,13 +86,13 @@
                             '<div class="items-line__body">' +
                                 '<div class="scroll scroll--horizontal">' +
                                     '<div class="scroll__content"><div class="scroll__body full-reviews ' + id + '-items"></div></div>' +
-                                '</div>' +
+                                </div>' +
                             '</div>' +
                         '</div>';
                 
                 var target = $('.items-line:first');
                 if (target.length > 0) target.after(html);
-                else $('.full-start__info, .full-start-new__details').append(html);
+                else $('.full-start-new__details').append(html);
             }
 
             function loadMainInfo(kp_id) {
@@ -130,11 +131,10 @@
                                 
                                 item.on('hover:enter', function () {
                                     Lampa.Noty.show('Загрузка карточки...');
-                                    var network = new Lampa.Reguest();
-                                    network.silent('https://api.alloha.tv/?token=04941a9a3ca3ac16e2b4327347bbc1&kp=' + sim.filmId, function (al_json) {
-                                        if (al_json && al_json.data && al_json.data.id_tmdb) {
-                                            var method = (al_json.data.type && al_json.data.type === 'tv-series') ? 'tv' : 'movie';
-                                            Lampa.Activity.push({ url: '', component: 'full', id: al_json.data.id_tmdb, method: method, source: 'tmdb' });
+                                    // Переход по похожим тоже делаем через текстовый поиск Кинопоиска (Защита от CORS)
+                                    apiRequest('https://kinopoiskapiunofficial.tech/api/v2.2/films/' + sim.filmId, function(simDetails) {
+                                        if (simDetails && simDetails.imdbId) {
+                                            Lampa.Activity.push({ url: '', component: 'full', id: simDetails.imdbId, method: isTvShow ? 'tv' : 'movie', source: 'imdb' });
                                         } else {
                                             Lampa.Activity.push({ component: 'search', query: name });
                                         }
@@ -235,7 +235,7 @@
             }
 
             function startFetching(kp_id) {
-                Lampa.Noty.show('✅ Фильм найден! Загружаю данные Кинопоиска...');
+                Lampa.Noty.show('✅ Фильм найден! Загружаю блоки...');
                 var delay = 0;
                 var queue = [];
 
@@ -253,31 +253,23 @@
                 }
             }
 
-            // Попытка 1: Проверяем стандартные ID в карточке Lampa
+            // Главная логика: Проверяем готовый ID или ищем по названию + год через защищенный прокси
             var kp_id = e.data.movie.kinopoisk_id || e.data.movie.kp_id || e.data.movie.id_kp;
             
             if (kp_id) {
                 startFetching(kp_id);
-            } else if (e.data.movie.id) {
-                // Попытка 2: Ищем через Alloha
-                var net = new Lampa.Reguest();
-                net.silent('https://api.alloha.tv/?token=04941a9a3ca3ac16e2b4327347bbc1&tmdb=' + e.data.movie.id, function (json) {
-                    if (json && json.data && json.data.id_kp) {
-                        startFetching(json.data.id_kp);
+            } else {
+                var searchQuery = movieTitle + (movieYear ? ' ' + movieYear : '');
+                var searchUrl = 'https://kinopoiskapiunofficial.tech/api/v2.1/films/search-by-keyword?keyword=' + encodeURIComponent(searchQuery);
+                
+                apiRequest(searchUrl, function(searchJson) {
+                    if (searchJson && searchJson.films && searchJson.films.length > 0) {
+                        startFetching(searchJson.films[0].filmId);
                     } else {
-                        // Попытка 3 (Фолбэк): Фильм новый (2026), ищем на КП напрямую по названию
-                        apiRequest('https://kinopoiskapiunofficial.tech/api/v2.1/films/search-by-keyword?keyword=' + encodeURIComponent(movieTitle), function(searchJson) {
-                            if (searchJson && searchJson.films && searchJson.films.length > 0) {
-                                startFetching(searchJson.films[0].filmId);
-                            } else {
-                                Lampa.Noty.show('❌ Фильм не найден в базе Кинопоиска.');
-                            }
-                        }, function() {
-                            Lampa.Noty.show('❌ Ошибка проверки ключа или сети.');
-                        });
+                        Lampa.Noty.show('❌ Фильм не найден на Кинопоиске.');
                     }
                 }, function() {
-                    Lampa.Noty.show('❌ Сбой сети базы Alloha.');
+                    Lampa.Noty.show('❌ Ошибка сети прокси при поиске.');
                 });
             }
         });
