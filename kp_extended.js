@@ -4,34 +4,23 @@
     function startPlugin() {
         window.free_kp_extended_ready = true;
 
-        // Добавляем компонент в настройки Lampa
+        // Создаем раздел в настройках Lampa
         Lampa.SettingsApi.addComponent({
             component: 'free_kp_extended',
             icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"></path><path d="M12 12v9"></path><path d="M8 17l4 4 4-4"></path></svg>',
             name: 'Кинопоиск (API)'
         });
 
-        // Параметр заголовка (СТРОГО без поля name в объекте param!)
         Lampa.SettingsApi.addParam({
             component: 'free_kp_extended',
-            param: {
-                type: 'title'
-            },
-            field: {
-                name: 'Авторизация'
-            }
+            param: { type: 'title' },
+            field: { name: 'Авторизация' }
         });
 
-        // Кнопка ввода ключа (СТРОГО без поля name в объекте param!)
         Lampa.SettingsApi.addParam({
             component: 'free_kp_extended',
-            param: {
-                type: 'button'
-            },
-            field: {
-                name: 'Ввести API Ключ',
-                description: 'Нажмите для ввода токена с сайта kinopoiskapiunofficial.tech'
-            },
+            param: { type: 'button' },
+            field: { name: 'Ввести API Ключ', description: 'Нажмите для ввода токена с сайта kinopoiskapiunofficial.tech' },
             onChange: function () {
                 Lampa.Input.edit({
                     title: 'Ввод ключа',
@@ -46,18 +35,12 @@
             }
         });
 
-        // Еще один заголовок подразделения настроек
         Lampa.SettingsApi.addParam({
             component: 'free_kp_extended',
-            param: {
-                type: 'title'
-            },
-            field: {
-                name: 'Отображение'
-            }
+            param: { type: 'title' },
+            field: { name: 'Отображение' }
         });
 
-        // Тумблеры (Обязательно с name, type и default строго внутри param)
         Lampa.SettingsApi.addParam({ component: 'free_kp_extended', param: { name: 'kp_show_slogan', type: 'trigger', default: true }, field: { name: 'Показывать слоган' }});
         Lampa.SettingsApi.addParam({ component: 'free_kp_extended', param: { name: 'kp_show_similars', type: 'trigger', default: true }, field: { name: 'Похожие фильмы (вместо Cub)' }});
         Lampa.SettingsApi.addParam({ component: 'free_kp_extended', param: { name: 'kp_show_facts', type: 'trigger', default: true }, field: { name: 'Показывать интересные факты' }});
@@ -67,7 +50,7 @@
         Lampa.SettingsApi.addParam({ component: 'free_kp_extended', param: { name: 'kp_show_posters', type: 'trigger', default: true }, field: { name: 'Показывать постеры' }});
         Lampa.SettingsApi.addParam({ component: 'free_kp_extended', param: { name: 'kp_show_wallpapers', type: 'trigger', default: true }, field: { name: 'Показывать обои' }});
 
-        // Слушатель событий Lampa для отрисовки блоков в карточке фильма
+        // Слушатель карточки фильма
         Lampa.Listener.follow('full', function (e) {
             if (e.type !== 'complite') return;
             if (!e.data || !e.data.movie) return;
@@ -75,28 +58,44 @@
             var token = Lampa.Storage.get('kp_unofficial_token', '');
             if (!token) return;
 
-            var network = new Lampa.Reguest();
-            var headers = { 'X-API-KEY': token, 'Content-Type': 'application/json' };
             var isTvShow = !!e.data.movie.name;
+            var movieTitle = e.data.movie.name || e.data.movie.title || e.data.movie.original_title;
+            
+            Lampa.Noty.show('🔌 Ищу «' + movieTitle + '» на Кинопоиске...');
+
+            // Функция для безопасных AJAX запросов через CORS-прокси
+            function apiRequest(url, successCallback, errorCallback) {
+                var proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(url);
+                $.ajax({
+                    url: proxyUrl,
+                    type: 'GET',
+                    headers: { 'X-API-KEY': token },
+                    dataType: 'json',
+                    success: successCallback,
+                    error: function(xhr, status, err) {
+                        if (errorCallback) errorCallback(err);
+                    }
+                });
+            }
 
             function createSection(id, title) {
+                if ($('.' + id).length > 0) return;
                 var html = '<div class="items-line layer--visible layer--render ' + id + '" style="display: none;">' +
-                            '<div class="items-line__head">' +
-                                '<div class="items-line__title">' + title + '</div>' +
-                            '</div>' +
+                            '<div class="items-line__head"><div class="items-line__title">' + title + '</div></div>' +
                             '<div class="items-line__body">' +
                                 '<div class="scroll scroll--horizontal">' +
-                                    '<div class="scroll__content">' +
-                                        '<div class="scroll__body full-reviews ' + id + '-items"></div>' +
-                                    '</div>' +
+                                    '<div class="scroll__content"><div class="scroll__body full-reviews ' + id + '-items"></div></div>' +
                                 '</div>' +
                             '</div>' +
                         '</div>';
-                $('.items-line:last').after(html);
+                
+                var target = $('.items-line:first');
+                if (target.length > 0) target.after(html);
+                else $('.full-start__info, .full-start-new__details').append(html);
             }
 
             function loadMainInfo(kp_id) {
-                network.silent('https://kinopoiskapiunofficial.tech/api/v2.2/films/' + kp_id, function (json) {
+                apiRequest('https://kinopoiskapiunofficial.tech/api/v2.2/films/' + kp_id, function (json) {
                     if (json && json.slogan && json.slogan !== '-') {
                         if ($('.kp-slogan').length === 0) {
                             var sloganHtml = '<div class="kp-slogan" style="font-style: italic; color: #a9a9a9; margin-bottom: 12px; font-size: 1.1em;">&laquo;' + json.slogan + '&raquo;</div>';
@@ -105,11 +104,11 @@
                             else $('.full-start-new__details').append(sloganHtml);
                         }
                     }
-                }, false, false, { headers: headers });
+                });
             }
 
             function loadSimilars(kp_id) {
-                network.silent('https://kinopoiskapiunofficial.tech/api/v2.2/films/' + kp_id + '/similars', function (json) {
+                apiRequest('https://kinopoiskapiunofficial.tech/api/v2.2/films/' + kp_id + '/similars', function (json) {
                     if (json && json.items && json.items.length > 0) {
                         $('.items-line__title').filter(function() {
                             var text = $(this).text().toLowerCase();
@@ -131,6 +130,7 @@
                                 
                                 item.on('hover:enter', function () {
                                     Lampa.Noty.show('Загрузка карточки...');
+                                    var network = new Lampa.Reguest();
                                     network.silent('https://api.alloha.tv/?token=04941a9a3ca3ac16e2b4327347bbc1&kp=' + sim.filmId, function (al_json) {
                                         if (al_json && al_json.data && al_json.data.id_tmdb) {
                                             var method = (al_json.data.type && al_json.data.type === 'tv-series') ? 'tv' : 'movie';
@@ -147,11 +147,11 @@
                         }
                         $('.kp-similars').show();
                     }
-                }, false, false, { headers: headers });
+                });
             }
 
             function loadFactsAndBloopers(kp_id) {
-                network.silent('https://kinopoiskapiunofficial.tech/api/v2.2/films/' + kp_id + '/facts', function (json) {
+                apiRequest('https://kinopoiskapiunofficial.tech/api/v2.2/films/' + kp_id + '/facts', function (json) {
                     if (json && json.items && json.items.length > 0) {
                         var facts = [];
                         var bloopers = [];
@@ -196,11 +196,11 @@
                         if (Lampa.Storage.get('kp_show_facts', true)) renderTextBlocks(facts, 'kp-facts', 'Знаете ли вы, что...', 'Интересные факты');
                         if (Lampa.Storage.get('kp_show_bloopers', true)) renderTextBlocks(bloopers, 'kp-bloopers', 'Ошибки в ' + (isTvShow ? 'сериале' : 'фильме'), 'Киноляпы');
                     }
-                }, false, false, { headers: headers });
+                });
             }
 
             function loadAwards(kp_id) {
-                network.silent('https://kinopoiskapiunofficial.tech/api/v2.2/films/' + kp_id + '/awards', function (json) {
+                apiRequest('https://kinopoiskapiunofficial.tech/api/v2.2/films/' + kp_id + '/awards', function (json) {
                     if (json && json.items && json.items.length > 0) {
                         createSection('kp-awards', 'Награды');
                         var itemsBlock = $('.kp-awards-items');
@@ -211,11 +211,11 @@
                         }
                         $('.kp-awards').show();
                     }
-                }, false, false, { headers: headers });
+                });
             }
 
             function loadImages(kp_id, type, title, containerClass) {
-                network.silent('https://kinopoiskapiunofficial.tech/api/v2.2/films/' + kp_id + '/images?type=' + type + '&page=1', function (json) {
+                apiRequest('https://kinopoiskapiunofficial.tech/api/v2.2/films/' + kp_id + '/images?type=' + type + '&page=1', function (json) {
                     if (json && json.items && json.items.length > 0) {
                         createSection(containerClass, title);
                         var itemsBlock = $('.' + containerClass + '-items');
@@ -231,10 +231,11 @@
                         }
                         $('.' + containerClass).show();
                     }
-                }, false, false, { headers: headers });
+                });
             }
 
             function startFetching(kp_id) {
+                Lampa.Noty.show('✅ Фильм найден! Загружаю данные Кинопоиска...');
                 var delay = 0;
                 var queue = [];
 
@@ -252,18 +253,36 @@
                 }
             }
 
+            // Попытка 1: Проверяем стандартные ID в карточке Lampa
             var kp_id = e.data.movie.kinopoisk_id || e.data.movie.kp_id || e.data.movie.id_kp;
-            if (!kp_id && e.data.movie.id) {
-                network.silent('https://api.alloha.tv/?token=04941a9a3ca3ac16e2b4327347bbc1&tmdb=' + e.data.movie.id, function (json) {
-                    if (json && json.data && json.data.id_kp) startFetching(json.data.id_kp);
-                });
-            } else if (kp_id) {
+            
+            if (kp_id) {
                 startFetching(kp_id);
+            } else if (e.data.movie.id) {
+                // Попытка 2: Ищем через Alloha
+                var net = new Lampa.Reguest();
+                net.silent('https://api.alloha.tv/?token=04941a9a3ca3ac16e2b4327347bbc1&tmdb=' + e.data.movie.id, function (json) {
+                    if (json && json.data && json.data.id_kp) {
+                        startFetching(json.data.id_kp);
+                    } else {
+                        // Попытка 3 (Фолбэк): Фильм новый (2026), ищем на КП напрямую по названию
+                        apiRequest('https://kinopoiskapiunofficial.tech/api/v2.1/films/search-by-keyword?keyword=' + encodeURIComponent(movieTitle), function(searchJson) {
+                            if (searchJson && searchJson.films && searchJson.films.length > 0) {
+                                startFetching(searchJson.films[0].filmId);
+                            } else {
+                                Lampa.Noty.show('❌ Фильм не найден в базе Кинопоиска.');
+                            }
+                        }, function() {
+                            Lampa.Noty.show('❌ Ошибка проверки ключа или сети.');
+                        });
+                    }
+                }, function() {
+                    Lampa.Noty.show('❌ Сбой сети базы Alloha.');
+                });
             }
         });
     }
 
-    // Фирменный безопасный метод ожидания полной готовности ядра Lampa
     if (window.Lampa) {
         startPlugin();
     } else {
@@ -272,7 +291,6 @@
                 if (e.type == 'ready' && !window.free_kp_extended_ready) startPlugin();
             });
         } else {
-            // Аварийный фолбэк на случай сбоя слушателей
             setTimeout(function() {
                 if (!window.free_kp_extended_ready) startPlugin();
             }, 1000);
