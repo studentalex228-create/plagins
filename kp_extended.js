@@ -1107,6 +1107,191 @@
                             });
 
                             dataList.forEach(function(f) {
+(function () {
+    'use strict';
+
+    function startPlugin() {
+        if (window.free_kp_extended_ready) return;
+        window.free_kp_extended_ready = true;
+
+        // 🎨 ВНЕДРЕНИЕ ПРЕМИУМ-ДИЗАЙНА (Чистый JS без сбоев)
+        if (!document.getElementById('kp-extended-css')) {
+            var style = document.createElement('style');
+            style.id = 'kp-extended-css';
+            style.innerHTML = '' +
+                '.kp-slogan { font-style: italic; color: #a9a9a9; margin-bottom: 12px; font-size: 1.15em; border-left: 3px solid #f60; padding-left: 10px; } ' +
+                '.kp-review-card { background: rgba(255,255,255,0.08); border-radius: 12px; padding: 15px; border: 1px solid rgba(255,255,255,0.05); transition: transform 0.2s, box-shadow 0.2s; height: 100%; display: flex; align-items: center; } ' +
+                '.kp-review-card.focus { transform: scale(1.02); box-shadow: 0 0 0 2px #fff; background: rgba(255,255,255,0.15); } ' +
+                '.kp-spoiler { color: #ff5252; font-weight: 700; font-size: 0.85em; text-transform: uppercase; margin-right: 6px; background: rgba(255,82,82,0.15); padding: 2px 6px; border-radius: 4px; } ' +
+                '.kp-image-card { border-radius: 12px; overflow: hidden; height: 180px; width: 320px; position: relative; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.4); transition: transform 0.2s; } ' +
+                '.kp-image-card.focus { transform: scale(1.03); box-shadow: 0 0 0 3px #fff; } ' +
+                '.kp-similar-wrap { width: 130px; margin-right: 15px; display: inline-block; vertical-align: top; text-align: center; cursor: pointer; } ' +
+                '.kp-similar-poster { width: 130px; height: 195px; border-radius: 10px; object-fit: cover; box-shadow: 0 4px 10px rgba(0,0,0,0.3); transition: transform 0.2s, box-shadow 0.2s; } ' +
+                '.kp-similar-wrap.focus .kp-similar-poster { transform: scale(1.05); box-shadow: 0 0 0 3px #fff; } ' +
+                '.kp-similar-title { margin-top: 8px; font-size: 0.85em; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; color: #eee; } ' +
+                '.kp-modal-text { font-size: 1.1em; line-height: 1.5; color: #ddd; } ' +
+                '.kp-modal-text hr { border: none; border-top: 1px solid rgba(255,255,255,0.1); margin: 15px 0; }';
+            document.head.appendChild(style);
+        }
+
+        // ⚙️ БЕЗОПАСНЫЕ НАСТРОЙКИ (Только стандартные тумблеры, чтобы Lampa не падала)
+        Lampa.SettingsApi.addComponent({
+            component: 'free_kp_ext',
+            icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"></path><path d="M12 12v9"></path><path d="M8 17l4 4 4-4"></path></svg>',
+            name: 'Кинопоиск (API)'
+        });
+
+        Lampa.SettingsApi.addParam({ component: 'free_kp_ext', param: { name: 'kp_title_1', type: 'title' }, field: { name: 'Настройки отображения' } });
+        Lampa.SettingsApi.addParam({ component: 'free_kp_ext', param: { name: 'kp_show_slogan', type: 'trigger', default: true }, field: { name: 'Показывать слоган' } });
+        Lampa.SettingsApi.addParam({ component: 'free_kp_ext', param: { name: 'kp_show_similars', type: 'trigger', default: true }, field: { name: 'Похожие фильмы' } });
+        Lampa.SettingsApi.addParam({ component: 'free_kp_ext', param: { name: 'kp_show_facts', type: 'trigger', default: true }, field: { name: 'Интересные факты' } });
+        Lampa.SettingsApi.addParam({ component: 'free_kp_ext', param: { name: 'kp_show_bloopers', type: 'trigger', default: true }, field: { name: 'Ошибки (киноляпы)' } });
+        Lampa.SettingsApi.addParam({ component: 'free_kp_ext', param: { name: 'kp_show_awards', type: 'trigger', default: true }, field: { name: 'Награды' } });
+        Lampa.SettingsApi.addParam({ component: 'free_kp_ext', param: { name: 'kp_show_stills', type: 'trigger', default: true }, field: { name: 'Кадры' } });
+        Lampa.SettingsApi.addParam({ component: 'free_kp_ext', param: { name: 'kp_show_posters', type: 'trigger', default: true }, field: { name: 'Постеры' } });
+        
+        Lampa.SettingsApi.addParam({
+            component: 'free_kp_ext',
+            param: { name: 'kp_reset_token', type: 'trigger', default: false },
+            field: { name: 'Удалить текущий API Ключ', description: 'Сброс ключа. Ввести новый можно будет на карточке любого фильма.' },
+            onChange: function (val) {
+                if (val) {
+                    Lampa.Storage.set('kp_unofficial_token', '');
+                    Lampa.Storage.set('kp_reset_token', false);
+                    Lampa.Noty.show('Ключ удален! Откройте любой фильм.');
+                }
+            }
+        });
+
+        // 🎬 ОСНОВНАЯ ЛОГИКА И ИНТЕРФЕЙС
+        Lampa.Listener.follow('full', function (e) {
+            if (e.type !== 'complite' || !e.data || !e.data.movie) return;
+
+            var page = e.object.activity.render();
+            var token = Lampa.Storage.get('kp_unofficial_token', '');
+
+            // 🔑 ЕСЛИ КЛЮЧА НЕТ: Выводим кнопку прямо в карточке фильма!
+            if (!token) {
+                if (page.find('.button--kp-token').length === 0) {
+                    var btnHtml = '<div class="full-start__button selector button--kp-token" style="background: rgba(255,102,0,0.15); border: 1px solid #f60;">' +
+                                  '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#f60" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path></svg>' +
+                                  '<span style="color:#f60; font-weight:bold;">Ключ Кинопоиска</span></div>';
+                    var btn = $(btnHtml);
+                    
+                    btn.on('hover:enter', function () {
+                        Lampa.Input.edit({ title: 'Введите ключ API', value: '', free: true }, function (new_value) {
+                            if (new_value && new_value.trim()) {
+                                Lampa.Storage.set('kp_unofficial_token', new_value.trim());
+                                btn.remove();
+                                Lampa.Noty.show('Ключ сохранен! Перезайдите в фильм.');
+                            }
+                        });
+                    });
+
+                    var btnContainer = page.find('.full-start-new__buttons');
+                    if (!btnContainer.length) btnContainer = page.find('.full-start__buttons');
+                    if (btnContainer.length) btnContainer.append(btn);
+                }
+                return; // Останавливаем выполнение, ждем пока введут ключ
+            }
+
+            // 🚀 ЕСЛИ КЛЮЧ ЕСТЬ: Загружаем данные
+            var network = new Lampa.Reguest();
+            var isTvShow = !!e.data.movie.name;
+            var movieTitle = e.data.movie.name || e.data.movie.title || e.data.movie.original_title || '';
+            var movieYear = (e.data.movie.release_date || e.data.movie.first_air_date || '').split('-')[0];
+
+            function apiRequest(endpoint, successCall) {
+                network.silent('https://kinopoiskapiunofficial.tech/api/' + endpoint, successCall, function() {}, false, {
+                    headers: { 'X-API-KEY': token, 'Content-Type': 'application/json' }
+                });
+            }
+
+            function createSection(id, title) {
+                if (page.find('.' + id).length > 0) return;
+                var html = '<div class="items-line layer--visible layer--render ' + id + '">' +
+                            '<div class="items-line__head"><div class="items-line__title">' + title + '</div></div>' +
+                            '<div class="items-line__body">' +
+                                '<div class="scroll scroll--horizontal">' +
+                                    '<div class="scroll__content"><div class="scroll__body full-reviews ' + id + '-items" style="padding-top:10px; padding-bottom:15px;"></div></div>' +
+                                '</div>' +
+                            '</div>' +
+                        '</div>';
+                
+                var target = page.find('.items-line').last();
+                if (target.length) target.after(html);
+                else page.find('.full-start-new__details, .full-start__details').append(html);
+            }
+
+            function loadMainInfo(kp_id) {
+                apiRequest('v2.2/films/' + kp_id, function(json) {
+                    if (json && json.slogan && json.slogan !== '-' && page.find('.kp-slogan').length === 0) {
+                        var sloganHtml = '<div class="kp-slogan">&laquo;' + json.slogan + '&raquo;</div>';
+                        var desc = page.find('.full-start-new__description, .full-start__description');
+                        if (desc.length) desc.before(sloganHtml);
+                        else page.find('.full-start-new__details').append(sloganHtml);
+                    }
+                });
+            }
+
+            function loadSimilars(kp_id) {
+                apiRequest('v2.2/films/' + kp_id + '/similars', function(json) {
+                    if (json && json.items && json.items.length) {
+                        page.find('.items-line__title').filter(function() {
+                            var t = $(this).text().toLowerCase();
+                            return t.indexOf('рекомендуем') !== -1 || t.indexOf('похожи') !== -1 || t.indexOf('связанн') !== -1;
+                        }).closest('.items-line').hide();
+
+                        createSection('kp-similars', 'Похожие (Кинопоиск)');
+                        var itemsBlock = page.find('.kp-similars-items');
+                        
+                        json.items.forEach(function(sim) {
+                            var name = sim.nameRu || sim.nameEn || sim.nameOriginal;
+                            var poster = sim.posterUrlPreview || 'https://via.placeholder.com/130x195?text=Нет+постера';
+                            var item = $('<div class="selector layer--visible kp-similar-wrap">' +
+                                            '<img src="' + poster + '" class="kp-similar-poster" />' +
+                                            '<div class="kp-similar-title">' + name + '</div>' +
+                                        '</div>');
+                            
+                            item.on('hover:enter', function() {
+                                Lampa.Noty.show('Загрузка карточки...');
+                                apiRequest('v2.2/films/' + sim.filmId, function(details) {
+                                    if (details && details.imdbId) {
+                                        Lampa.Activity.push({ url: '', component: 'full', id: details.imdbId, method: isTvShow ? 'tv' : 'movie', source: 'imdb' });
+                                    } else {
+                                        Lampa.Activity.push({ component: 'search', query: name });
+                                    }
+                                });
+                            });
+                            itemsBlock.append(item);
+                        });
+                    }
+                });
+            }
+
+            function loadFactsAndBloopers(kp_id) {
+                apiRequest('v2.2/films/' + kp_id + '/facts', function(json) {
+                    if (json && json.items && json.items.length) {
+                        var facts = [];
+                        var bloopers = [];
+                        json.items.forEach(function(f) {
+                            if (f.type === 'FACT') facts.push(f);
+                            if (f.type === 'BLOOPER') bloopers.push(f);
+                        });
+
+                        function renderBlocks(dataList, containerClass, title, modalTitle) {
+                            if (!dataList.length) return;
+                            createSection(containerClass, title);
+                            var itemsBlock = page.find('.' + containerClass + '-items');
+                            
+                            var fullTextHtml = '';
+                            dataList.forEach(function(f) {
+                                var clean = f.text.replace(/<[^>]+>/g, '');
+                                var spoiler = f.spoiler ? '<span class="kp-spoiler">[СПОЙЛЕР]</span>' : '';
+                                fullTextHtml += spoiler + clean + '<br><hr>';
+                            });
+
+                            dataList.forEach(function(f) {
                                 var clean = f.text.replace(/<[^>]+>/g, '');
                                 var spoiler = f.spoiler ? '<span class="kp-spoiler">СПОЙЛЕР</span>' : '';
                                 var preview = clean.length > 180 ? clean.substring(0, 180) + '...' : clean;
@@ -1151,6 +1336,61 @@
                 apiRequest('v2.2/films/' + kp_id + '/images?type=' + type + '&page=1', function(json) {
                     if (json && json.items && json.items.length) {
                         createSection(containerClass, title);
+                        var itemsBlock = page.find('.' + containerClass + '-items');
+                        json.items.forEach(function(img) {
+                            var item = $('<div class="selector layer--visible kp-image-card" style="margin-right: 15px; background: url(\'' + img.previewUrl + '\') center/cover no-repeat;"></div>');
+                            item.on('hover:enter', function() {
+                                Lampa.Modal.open({ 
+                                    title: title, 
+                                    html: $('<div style="text-align:center; padding: 20px;"><img src="' + img.imageUrl + '" style="max-width:100%; max-height:80vh; border-radius:12px; box-shadow: 0 10px 30px rgba(0,0,0,0.7);"></div>'), 
+                                    size: "large", mask: true, onBack: function() { Lampa.Modal.close(); } 
+                                });
+                            });
+                            itemsBlock.append(item);
+                        });
+                    }
+                });
+            }
+
+            function startFetching(kp_id) {
+                Lampa.Noty.show('Данные загружаются...');
+                if (Lampa.Storage.get('kp_show_slogan', true)) loadMainInfo(kp_id);
+                if (Lampa.Storage.get('kp_show_facts', true) || Lampa.Storage.get('kp_show_bloopers', true)) loadFactsAndBloopers(kp_id);
+                if (Lampa.Storage.get('kp_show_similars', true)) loadSimilars(kp_id);
+                if (Lampa.Storage.get('kp_show_awards', true)) loadAwards(kp_id);
+                if (Lampa.Storage.get('kp_show_stills', true)) loadImages(kp_id, 'STILL', 'Кадры', 'kp-stills');
+                if (Lampa.Storage.get('kp_show_posters', true)) loadImages(kp_id, 'POSTER', 'Постеры', 'kp-posters');
+            }
+
+            var kpid = e.data.movie.kinopoisk_id || e.data.movie.kp_id || e.data.movie.id_kp;
+            if (kpid) {
+                startFetching(kpid);
+            } else {
+                var query = encodeURIComponent(movieTitle + (movieYear ? ' ' + movieYear : ''));
+                apiRequest('v2.1/films/search-by-keyword?keyword=' + query, function(searchJson) {
+                    if (searchJson && searchJson.films && searchJson.films.length) {
+                        startFetching(searchJson.films[0].filmId);
+                    } else {
+                        console.log("KP: Not found");
+                    }
+                });
+            }
+        });
+    }
+
+    if (window.Lampa) startPlugin();
+    else {
+        if (window.LampaListener) {
+            window.LampaListener.follow("app", function(e) {
+                if (e.type === "ready") startPlugin();
+            });
+        } else {
+            setTimeout(startPlugin, 1000);
+        }
+    }
+})();
+
+                   createSection(containerClass, title);
                         var itemsBlock = page.find('.' + containerClass + '-items');
                         json.items.forEach(function(img) {
                             var item = $('<div class="selector layer--visible kp-image-card" style="margin-right: 15px; background: url(\'' + img.previewUrl + '\') center/cover no-repeat;"></div>');
