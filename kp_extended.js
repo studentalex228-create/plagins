@@ -1347,19 +1347,265 @@
                                 });
                             });
                             itemsBlock.append(item);
+(function () {
+    'use strict';
+
+    function startPlugin() {
+        if (window.free_kp_extended_ready) return;
+        window.free_kp_extended_ready = true;
+
+        // 🎨 ВНЕДРЕНИЕ ПРЕМИУМ-ДИЗАЙНА
+        if (!document.getElementById('kp-extended-css')) {
+            var style = document.createElement('style');
+            style.id = 'kp-extended-css';
+            style.innerHTML = '' +
+                '.kp-slogan { font-style: italic; color: #a9a9a9; margin-bottom: 12px; font-size: 1.15em; border-left: 3px solid #f60; padding-left: 10px; } ' +
+                '.kp-review-card { background: rgba(255,255,255,0.08); border-radius: 12px; padding: 15px; border: 1px solid rgba(255,255,255,0.05); transition: transform 0.2s, box-shadow 0.2s; height: 100%; display: flex; align-items: center; } ' +
+                '.kp-review-card.focus { transform: scale(1.02); box-shadow: 0 0 0 2px #fff; background: rgba(255,255,255,0.15); } ' +
+                '.kp-spoiler { color: #ff5252; font-weight: 700; font-size: 0.85em; text-transform: uppercase; margin-right: 6px; background: rgba(255,82,82,0.15); padding: 2px 6px; border-radius: 4px; } ' +
+                '.kp-image-card { border-radius: 12px; overflow: hidden; height: 180px; width: 320px; position: relative; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.4); transition: transform 0.2s; } ' +
+                '.kp-image-card.focus { transform: scale(1.03); box-shadow: 0 0 0 3px #fff; } ' +
+                '.kp-similar-wrap { width: 130px; margin-right: 15px; display: inline-block; vertical-align: top; text-align: center; cursor: pointer; } ' +
+                '.kp-similar-poster { width: 130px; height: 195px; border-radius: 10px; object-fit: cover; box-shadow: 0 4px 10px rgba(0,0,0,0.3); transition: transform 0.2s, box-shadow 0.2s; } ' +
+                '.kp-similar-wrap.focus .kp-similar-poster { transform: scale(1.05); box-shadow: 0 0 0 3px #fff; } ' +
+                '.kp-similar-title { margin-top: 8px; font-size: 0.85em; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; color: #eee; } ' +
+                '.kp-modal-text { font-size: 1.1em; line-height: 1.5; color: #ddd; } ' +
+                '.kp-modal-text hr { border: none; border-top: 1px solid rgba(255,255,255,0.1); margin: 15px 0; }';
+            document.head.appendChild(style);
+        }
+
+        // Вспомогательная функция для получения настроек
+        function getSetting(key) {
+            return Lampa.Storage.get(key, true);
+        }
+
+        // 🎬 ОСНОВНАЯ ЛОГИКА
+        Lampa.Listener.follow('full', function (e) {
+            if (e.type !== 'complite' || !e.data || !e.data.movie) return;
+
+            var page = e.object.activity.render();
+            var token = Lampa.Storage.get('kp_unofficial_token', '');
+
+            // ⚙️ СОЗДАЕМ СОБСТВЕННУЮ КНОПКУ НАСТРОЕК В КАРТОЧКЕ ФИЛЬМА
+            if (page.find('.button--kp-settings').length === 0) {
+                var btnTitle = token ? 'Кинопоиск' : 'API Ключ (Нажать)';
+                var btnHtml = '<div class="full-start__button selector button--kp-settings" style="background: rgba(255,102,0,0.15); border: 1px solid #f60;">' +
+                              '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#f60" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>' +
+                              '<span style="color:#f60; font-weight:bold;">' + btnTitle + '</span></div>';
+                var btn = $(btnHtml);
+                
+                btn.on('hover:enter', function () {
+                    function openKpMenu() {
+                        var currentToken = Lampa.Storage.get('kp_unofficial_token', '');
+                        var items = [
+                            { title: currentToken ? '🔑 Изменить API Ключ' : '🔑 Ввести API Ключ', type: 'key' },
+                            { title: (getSetting('kp_show_slogan') ? '✅' : '❌') + ' Показывать слоган', type: 'toggle', prop: 'kp_show_slogan' },
+                            { title: (getSetting('kp_show_similars') ? '✅' : '❌') + ' Похожие фильмы', type: 'toggle', prop: 'kp_show_similars' },
+                            { title: (getSetting('kp_show_facts') ? '✅' : '❌') + ' Интересные факты', type: 'toggle', prop: 'kp_show_facts' },
+                            { title: (getSetting('kp_show_bloopers') ? '✅' : '❌') + ' Ошибки (киноляпы)', type: 'toggle', prop: 'kp_show_bloopers' },
+                            { title: (getSetting('kp_show_awards') ? '✅' : '❌') + ' Награды', type: 'toggle', prop: 'kp_show_awards' },
+                            { title: (getSetting('kp_show_stills') ? '✅' : '❌') + ' Кадры', type: 'toggle', prop: 'kp_show_stills' },
+                            { title: (getSetting('kp_show_posters') ? '✅' : '❌') + ' Постеры', type: 'toggle', prop: 'kp_show_posters' }
+                        ];
+
+                        Lampa.Select.show({
+                            title: 'Настройки Кинопоиска',
+                            items: items,
+                            onSelect: function (a) {
+                                if (a.type === 'key') {
+                                    Lampa.Input.edit({ title: 'API Ключ', value: currentToken, free: true }, function (new_value) {
+                                        if (new_value) {
+                                            Lampa.Storage.set('kp_unofficial_token', new_value.trim());
+                                            Lampa.Noty.show('Ключ сохранен! Перезайдите в фильм.');
+                                        }
+                                        Lampa.Controller.toggle('content');
+                                    });
+                                } else if (a.type === 'toggle') {
+                                    Lampa.Storage.set(a.prop, !getSetting(a.prop));
+                                    openKpMenu(); // Перерисовываем меню, чтобы галочка обновилась
+                                }
+                            },
+                            onBack: function () {
+                                Lampa.Controller.toggle('content');
+                            }
+                        });
+                    }
+                    openKpMenu();
+                });
+
+                var btnContainer = page.find('.full-start-new__buttons');
+                if (!btnContainer.length) btnContainer = page.find('.full-start__buttons');
+                if (btnContainer.length) btnContainer.append(btn);
+            }
+
+            // Если ключа нет, просто выходим и ждем, пока юзер его введет
+            if (!token) return;
+
+            // 🚀 ЗАГРУЗКА ДАННЫХ
+            var network = new Lampa.Reguest();
+            var isTvShow = !!e.data.movie.name;
+            var movieTitle = e.data.movie.name || e.data.movie.title || e.data.movie.original_title || '';
+            var movieYear = (e.data.movie.release_date || e.data.movie.first_air_date || '').split('-')[0];
+
+            function apiRequest(endpoint, successCall) {
+                network.silent('https://kinopoiskapiunofficial.tech/api/' + endpoint, successCall, function() {}, false, {
+                    headers: { 'X-API-KEY': token, 'Content-Type': 'application/json' }
+                });
+            }
+
+            function createSection(id, title) {
+                if (page.find('.' + id).length > 0) return;
+                var html = '<div class="items-line layer--visible layer--render ' + id + '">' +
+                            '<div class="items-line__head"><div class="items-line__title">' + title + '</div></div>' +
+                            '<div class="items-line__body">' +
+                                '<div class="scroll scroll--horizontal">' +
+                                    '<div class="scroll__content"><div class="scroll__body full-reviews ' + id + '-items" style="padding-top:10px; padding-bottom:15px;"></div></div>' +
+                                '</div>' +
+                            '</div>' +
+                        '</div>';
+                
+                var target = page.find('.items-line').last();
+                if (target.length) target.after(html);
+                else page.find('.full-start-new__details, .full-start__details').append(html);
+            }
+
+            function loadMainInfo(kp_id) {
+                apiRequest('v2.2/films/' + kp_id, function(json) {
+                    if (json && json.slogan && json.slogan !== '-' && page.find('.kp-slogan').length === 0) {
+                        var sloganHtml = '<div class="kp-slogan">&laquo;' + json.slogan + '&raquo;</div>';
+                        var desc = page.find('.full-start-new__description, .full-start__description');
+                        if (desc.length) desc.before(sloganHtml);
+                        else page.find('.full-start-new__details').append(sloganHtml);
+                    }
+                });
+            }
+
+            function loadSimilars(kp_id) {
+                apiRequest('v2.2/films/' + kp_id + '/similars', function(json) {
+                    if (json && json.items && json.items.length) {
+                        page.find('.items-line__title').filter(function() {
+                            var t = $(this).text().toLowerCase();
+                            return t.indexOf('рекомендуем') !== -1 || t.indexOf('похожи') !== -1 || t.indexOf('связанн') !== -1;
+                        }).closest('.items-line').hide();
+
+                        createSection('kp-similars', 'Похожие (Кинопоиск)');
+                        var itemsBlock = page.find('.kp-similars-items');
+                        
+                        json.items.forEach(function(sim) {
+                            var name = sim.nameRu || sim.nameEn || sim.nameOriginal;
+                            var poster = sim.posterUrlPreview || 'https://via.placeholder.com/130x195?text=Нет+постера';
+                            var item = $('<div class="selector layer--visible kp-similar-wrap">' +
+                                            '<img src="' + poster + '" class="kp-similar-poster" />' +
+                                            '<div class="kp-similar-title">' + name + '</div>' +
+                                        '</div>');
+                            
+                            item.on('hover:enter', function() {
+                                Lampa.Noty.show('Загрузка карточки...');
+                                apiRequest('v2.2/films/' + sim.filmId, function(details) {
+                                    if (details && details.imdbId) {
+                                        Lampa.Activity.push({ url: '', component: 'full', id: details.imdbId, method: isTvShow ? 'tv' : 'movie', source: 'imdb' });
+                                    } else {
+                                        Lampa.Activity.push({ component: 'search', query: name });
+                                    }
+                                });
+                            });
+                            itemsBlock.append(item);
+                        });
+                    }
+                });
+            }
+
+            function loadFactsAndBloopers(kp_id) {
+                apiRequest('v2.2/films/' + kp_id + '/facts', function(json) {
+                    if (json && json.items && json.items.length) {
+                        var facts = [];
+                        var bloopers = [];
+                        json.items.forEach(function(f) {
+                            if (f.type === 'FACT') facts.push(f);
+                            if (f.type === 'BLOOPER') bloopers.push(f);
+                        });
+
+                        function renderBlocks(dataList, containerClass, title, modalTitle) {
+                            if (!dataList.length) return;
+                            createSection(containerClass, title);
+                            var itemsBlock = page.find('.' + containerClass + '-items');
+                            
+                            var fullTextHtml = '';
+                            dataList.forEach(function(f) {
+                                var clean = f.text.replace(/<[^>]+>/g, '');
+                                var spoiler = f.spoiler ? '<span class="kp-spoiler">[СПОЙЛЕР]</span>' : '';
+                                fullTextHtml += spoiler + clean + '<br><hr>';
+                            });
+
+                            dataList.forEach(function(f) {
+                                var clean = f.text.replace(/<[^>]+>/g, '');
+                                var spoiler = f.spoiler ? '<span class="kp-spoiler">СПОЙЛЕР</span>' : '';
+                                var preview = clean.length > 180 ? clean.substring(0, 180) + '...' : clean;
+                                
+                                var item = $('<div class="full-review selector layer--visible type--line kp-review-card" style="width: 350px; margin-right: 15px;">' +
+                                                '<div class="full-review__text" style="font-size: 0.95em; line-height: 1.4;">' + spoiler + preview + '</div>' +
+                                            '</div>');
+                                
+                                item.on('hover:enter', function() {
+                                    Lampa.Modal.open({
+                                        title: modalTitle,
+                                        html: $('<div class="broadcast__text kp-modal-text"><div class="otzyv">' + fullTextHtml + '</div></div>'),
+                                        size: "large", mask: true, onBack: function() { Lampa.Modal.close(); }
+                                    });
+                                });
+                                itemsBlock.append(item);
+                            });
+                        }
+
+                        if (getSetting('kp_show_facts')) renderBlocks(facts, 'kp-facts', 'Знаете ли вы, что...', 'Интересные факты');
+                        if (getSetting('kp_show_bloopers')) renderBlocks(bloopers, 'kp-bloopers', 'Ошибки ' + (isTvShow ? 'в сериале' : 'в фильме'), 'Киноляпы');
+                    }
+                });
+            }
+
+            function loadAwards(kp_id) {
+                apiRequest('v2.2/films/' + kp_id + '/awards', function(json) {
+                    if (json && json.items && json.items.length) {
+                        createSection('kp-awards', 'Награды');
+                        var itemsBlock = page.find('.kp-awards-items');
+                        json.items.forEach(function(a) {
+                            var status = a.win ? '<span style="color:#79D29E; font-weight:bold;">🏆 Победа</span>' : '<span style="color:#bbb;">⭐ Номинация</span>';
+                            itemsBlock.append($('<div class="full-review selector layer--visible type--line kp-review-card" style="min-width: 240px; margin-right: 15px;">' +
+                                    '<div class="full-review__text" style="line-height: 1.4;">' + status + '<br><b style="color:#fff;">' + a.name + ' (' + a.year + ')</b><br><span style="color:#aaa; font-size: 0.9em;">' + a.nominationName + '</span></div>' +
+                                '</div>'));
+                        });
+                    }
+                });
+            }
+
+            function loadImages(kp_id, type, title, containerClass) {
+                apiRequest('v2.2/films/' + kp_id + '/images?type=' + type + '&page=1', function(json) {
+                    if (json && json.items && json.items.length) {
+                        createSection(containerClass, title);
+                        var itemsBlock = page.find('.' + containerClass + '-items');
+                        json.items.forEach(function(img) {
+                            var item = $('<div class="selector layer--visible kp-image-card" style="margin-right: 15px; background: url(\'' + img.previewUrl + '\') center/cover no-repeat;"></div>');
+                            item.on('hover:enter', function() {
+                                Lampa.Modal.open({ 
+                                    title: title, 
+                                    html: $('<div style="text-align:center; padding: 20px;"><img src="' + img.imageUrl + '" style="max-width:100%; max-height:80vh; border-radius:12px; box-shadow: 0 10px 30px rgba(0,0,0,0.7);"></div>'), 
+                                    size: "large", mask: true, onBack: function() { Lampa.Modal.close(); } 
+                                });
+                            });
+                            itemsBlock.append(item);
                         });
                     }
                 });
             }
 
             function startFetching(kp_id) {
-                Lampa.Noty.show('Данные загружаются...');
-                if (Lampa.Storage.get('kp_show_slogan', true)) loadMainInfo(kp_id);
-                if (Lampa.Storage.get('kp_show_facts', true) || Lampa.Storage.get('kp_show_bloopers', true)) loadFactsAndBloopers(kp_id);
-                if (Lampa.Storage.get('kp_show_similars', true)) loadSimilars(kp_id);
-                if (Lampa.Storage.get('kp_show_awards', true)) loadAwards(kp_id);
-                if (Lampa.Storage.get('kp_show_stills', true)) loadImages(kp_id, 'STILL', 'Кадры', 'kp-stills');
-                if (Lampa.Storage.get('kp_show_posters', true)) loadImages(kp_id, 'POSTER', 'Постеры', 'kp-posters');
+                Lampa.Noty.show('Данные Кинопоиска загружаются...');
+                if (getSetting('kp_show_slogan')) loadMainInfo(kp_id);
+                if (getSetting('kp_show_facts') || getSetting('kp_show_bloopers')) loadFactsAndBloopers(kp_id);
+                if (getSetting('kp_show_similars')) loadSimilars(kp_id);
+                if (getSetting('kp_show_awards')) loadAwards(kp_id);
+                if (getSetting('kp_show_stills')) loadImages(kp_id, 'STILL', 'Кадры', 'kp-stills');
+                if (getSetting('kp_show_posters')) loadImages(kp_id, 'POSTER', 'Постеры', 'kp-posters');
             }
 
             var kpid = e.data.movie.kinopoisk_id || e.data.movie.kp_id || e.data.movie.id_kp;
@@ -1370,8 +1616,6 @@
                 apiRequest('v2.1/films/search-by-keyword?keyword=' + query, function(searchJson) {
                     if (searchJson && searchJson.films && searchJson.films.length) {
                         startFetching(searchJson.films[0].filmId);
-                    } else {
-                        console.log("KP: Not found");
                     }
                 });
             }
@@ -1389,14 +1633,3 @@
         }
     }
 })();
-
-                   createSection(containerClass, title);
-                        var itemsBlock = page.find('.' + containerClass + '-items');
-                        json.items.forEach(function(img) {
-                            var item = $('<div class="selector layer--visible kp-image-card" style="margin-right: 15px; background: url(\'' + img.previewUrl + '\') center/cover no-repeat;"></div>');
-                            item.on('hover:enter', function() {
-                                Lampa.Modal.open({ 
-                                    title: title, 
-                                    html: $('<div style="text-align:center; padding: 20px;"><img src="' + img.imageUrl + '" style="max-width:100%; max-height:80vh; border-radius:12px; box-shadow: 0 10px 30px rgba(0,0,0,0.7);"></div>'), 
-                                    size: "large", mask: true, onBack: function() { Lampa.Modal.close(); } 
-                                });
