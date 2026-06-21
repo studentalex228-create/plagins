@@ -414,53 +414,84 @@
 
             Lampa.Modal.open({
                 title: menuTitle,
-                html: $(html),
-                size: 'large',
-                mask: true,
-                onBack: function() {
-                    Lampa.Modal.close();
-                    openMenu(kp_id, token, movieTitle, movieYear);
+(function () {
+    "use strict";
+
+    function startPlugin() {
+        if (window.free_kp_extended_ready) return;
+        window.free_kp_extended_ready = true;
+
+        Lampa.Listener.follow("full", function (e) {
+            if (e.type !== "complite" || !e.data || !e.data.movie) return;
+
+            var page = e.object.activity.render();
+            page.find(".button--kp-main-plus").remove();
+
+            var btnHtml = '<div class="full-start__button selector button--kp-main-plus" style="background: rgba(255,102,0,0.15); border: 1px solid #f60; margin-right: 10px;"><span style="color:#f60; font-weight:bold;">✨ Кинопоиск+</span></div>';
+            var btnContainer = page.find('.full-start-new__buttons').length ? page.find('.full-start-new__buttons') : page.find('.full-start__buttons');
+            if (btnContainer.length) btnContainer.append(btnHtml);
+
+            page.find(".button--kp-main-plus").on("hover:enter", function () {
+                var token = Lampa.Storage.get('kp_unofficial_token', '');
+                if (!token) {
+                    Lampa.Input.edit({ title: 'Введи API Ключ Кинопоиска', value: '', free: true }, function (new_val) {
+                        if (new_val) {
+                            Lampa.Storage.set('kp_unofficial_token', new_val.trim());
+                            Lampa.Noty.show('Ключ сохранен!');
+                        }
+                    });
+                    return;
+                }
+
+                var title = e.data.movie.name || e.data.movie.title || '';
+                var year = (e.data.movie.release_date || '').split('-')[0];
+                var kpid = e.data.movie.kinopoisk_id || e.data.movie.kp_id;
+
+                if (kpid) {
+                    openMenu(kpid, token, title, year);
+                } else {
+                    Lampa.Noty.show('Поиск...');
+                    var net = new Lampa.Reguest();
+                    var url = 'https://kinopoiskapiunofficial.tech/api/v2.1/films/search-by-keyword?keyword=' + encodeURIComponent(title);
+                    
+                    net.silent(url, function(json) {
+                        if (json.films && json.films.length > 0) {
+                            var id = json.films[0].filmId;
+                            openMenu(id, token, title, year);
+                        } else {
+                            Lampa.Noty.show('Не найдено');
+                        }
+                    }, function() { Lampa.Noty.show('Ошибка соединения'); }, false, { headers: { 'X-API-KEY': token } });
                 }
             });
-        })
-        .catch(function() {
-            Lampa.Loading.stop();
-            Lampa.Noty.show('Ошибка загрузки данных Кинопоиска.');
         });
     }
 
-    if (!window.free_kp_extended_ready) startPlugin();
+    function openMenu(id, token, title, year) {
+        var items = [{title: '💡 Интересные факты', action: 'facts'}, {title: '👥 Похожие', action: 'similars'}];
+        Lampa.Select.show({ title: 'Материалы', items: items, onSelect: function(i) {
+            if (i.action === 'facts') {
+                var net = new Lampa.Reguest();
+                net.silent('https://kinopoiskapiunofficial.tech/api/v2.2/films/' + id + '/facts', function(json) {
+                    Lampa.Noty.show(json.items[0] ? json.items[0].text : 'Нет фактов');
+                }, function() {}, false, { headers: { 'X-API-KEY': token } });
+            } else if (i.action === 'similars') {
+                Lampa.Noty.show('Похожие...');
+                var net = new Lampa.Reguest();
+                net.silent('https://kinopoiskapiunofficial.tech/api/v2.2/films/' + id + '/similars', function(json) {
+                    if (json.items && json.items.length > 0) {
+                        Lampa.Activity.push({ component: 'search', query: json.items[0].nameRu || json.items[0].nameOriginal });
+                    }
+                }, function() {}, false, { headers: { 'X-API-KEY': token } });
+            }
+        }});
+    }
+
+    if (window.Lampa) startPlugin();
+    else window.addEventListener('appfiles', startPlugin);
 })();
 
-о.</div>';
-            }
-            
-            else if (action === 'stills' || action === 'posters') {
-                if (json && json.items && json.items.length > 0) {
-                    html += '<div style="text-align:center;">';
-                    var widthPercent = action === 'stills' ? '92%' : '45%';
-                    for (var k = 0; k < json.items.length; k++) {
-                        html += '<img src="' + json.items[k].previewUrl + '" style="width:' + widthPercent + '; margin:8px; border-radius:8px; box-shadow:0 4px 10px rgba(0,0,0,0.4); border:1px solid rgba(255,255,255,0.1);" />';
-                    }
-                    html += '</div>';
-                } else html += '<div style="text-align:center; color:#aaa; padding:20px;">Изображений не найдено.</div>';
-            }
-
-            html += '</div>';
-
-            Lampa.Modal.open({
-                title: menuTitle,
-                html: $(html),
-                size: 'large',
-                mask: true,
-                onBack: function() {
-                    Lampa.Modal.close();
-                    openMenu(kp_id, token, movieTitle, movieYear);
-                }
-            });
-        })
-        .catch(function() {
-            Lampa.Loading.stop();
+ing.stop();
             Lampa.Noty.show('Ошибка загрузки данных Кинопоиска.');
         });
     }
