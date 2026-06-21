@@ -1503,6 +1503,244 @@
                                 Lampa.Noty.show('Загрузка карточки...');
                                 apiRequest('v2.2/films/' + sim.filmId, function(details) {
                                     if (details && details.imdbId) {
+(function () {
+    'use strict';
+
+    function startPlugin() {
+        if (window.free_kp_extended_ready) return;
+        window.free_kp_extended_ready = true;
+
+        // 🎨 ВНЕДРЕНИЕ ПРЕМИУМ-ДИЗАЙНА (Абсолютно безопасный метод без jQuery на старте)
+        if (!document.getElementById('kp-extended-css')) {
+            var style = document.createElement('style');
+            style.id = 'kp-extended-css';
+            style.innerHTML = '.kp-slogan { font-style: italic; color: #a9a9a9; margin-bottom: 12px; font-size: 1.15em; border-left: 3px solid #f60; padding-left: 10px; } .kp-review-card { background: rgba(255,255,255,0.08); border-radius: 12px; padding: 15px; border: 1px solid rgba(255,255,255,0.05); display: inline-block; vertical-align: top; width: 300px; margin-right: 15px; white-space: normal; } .kp-spoiler { color: #ff5252; font-weight: 700; font-size: 0.85em; background: rgba(255,82,82,0.15); padding: 2px 6px; border-radius: 4px; margin-right: 6px; } .kp-image-card { border-radius: 12px; overflow: hidden; height: 180px; width: 320px; display: inline-block; margin-right: 15px; background-size: cover; background-position: center; cursor: pointer; } .kp-similar-card { width: 130px; margin-right: 15px; display: inline-block; vertical-align: top; text-align: center; cursor: pointer; } .kp-similar-poster { width: 130px; height: 195px; border-radius: 10px; object-fit: cover; box-shadow: 0 4px 10px rgba(0,0,0,0.3); } .kp-similar-title { margin-top: 8px; font-size: 0.85em; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; color: #eee; white-space: normal; } .kp-modal-text { font-size: 1.1em; line-height: 1.5; color: #ddd; text-align: left; } .kp-modal-text hr { border: none; border-top: 1px solid rgba(255,255,255,0.1); margin: 15px 0; }';
+            document.head.appendChild(style);
+        }
+
+        // 🎬 СЛУШАТЕЛЯ КАРТОЧКИ ФИЛЬМА
+        Lampa.Listener.follow('full', function (e) {
+            if (e.type !== 'complite' || !e.data || !e.data.movie) return;
+
+            var page = e.object.activity.render();
+            var token = Lampa.Storage.get('kp_unofficial_token', '');
+
+            // 🔑 ЕСЛИ КЛЮЧА НЕТ — Показываем кнопку ввода прямо в карточке!
+            if (!token) {
+                if (page.find('.button--kp-token').length === 0) {
+                    var btn = $('<div class="full-start__button selector button--kp-token" style="background: rgba(255,102,0,0.15); border: 1px solid #f60; margin-right: 10px;"><span style="color:#f60; font-weight:bold;">🔑 Ключ Кинопоиска</span></div>');
+                    btn.on('hover:enter', function () {
+                        Lampa.Input.edit({ title: 'Введи API Ключ', value: '', free: true }, function (new_value) {
+                            if (new_value && new_value.trim()) {
+                                Lampa.Storage.set('kp_unofficial_token', new_value.trim());
+                                btn.remove();
+                                Lampa.Noty.show('Ключ успешно сохранен! Перезайдите в этот фильм.');
+                            }
+                        });
+                    });
+                    var btnContainer = page.find('.full-start-new__buttons');
+                    if (!btnContainer.length) btnContainer = page.find('.full-start__buttons');
+                    if (btnContainer.length) btnContainer.append(btn);
+                }
+                return;
+            }
+
+            // 🚀 ЕСЛИ КЛЮЧ ЕСТЬ — Запускаем безопасную загрузку
+            var network = new Lampa.Reguest();
+            var isTvShow = !!e.data.movie.name;
+            var movieTitle = e.data.movie.name || e.data.movie.title || e.data.movie.original_title || '';
+            var movieYear = '';
+            if (e.data.movie.release_date) movieYear = e.data.movie.release_date.split('-')[0];
+            else if (e.data.movie.first_air_date) movieYear = e.data.movie.first_air_date.split('-')[0];
+
+            Lampa.Noty.show('Ищу «' + movieTitle + '» на Кинопоиске...');
+
+            function apiRequest(endpoint, successCall) {
+                network.silent('https://kinopoiskapiunofficial.tech/api/' + endpoint, successCall, function() {}, false, {
+                    headers: { 'X-API-KEY': token, 'Content-Type': 'application/json' }
+                });
+            }
+
+            function createSection(id, title) {
+                if (page.find('.' + id).length > 0) return;
+                var html = '<div class="items-line layer--visible layer--render ' + id + '">' +
+                            '<div class="items-line__head"><div class="items-line__title">' + title + '</div></div>' +
+                            '<div class="items-line__body">' +
+                                '<div class="scroll scroll--horizontal">' +
+                                    '<div class="scroll__content"><div class="scroll__body full-reviews ' + id + '-items" style="padding-top:10px; padding-bottom:15px; white-space: nowrap;"></div></div>' +
+                                '</div>' +
+                            '</div>' +
+                        '</div>';
+                var target = page.find('.items-line').last();
+                if (target.length) target.after(html);
+                else page.find('.full-start-new__details, .full-start__details').append(html);
+            }
+
+            function loadMainInfo(kp_id) {
+                apiRequest('v2.2/films/' + kp_id, function(json) {
+                    if (json && json.slogan && json.slogan !== '-' && page.find('.kp-slogan').length === 0) {
+                        var sloganHtml = '<div class="kp-slogan">&laquo;' + json.slogan + '&raquo;</div>';
+                        var desc = page.find('.full-start-new__description, .full-start__description');
+                        if (desc.length) desc.before(sloganHtml);
+                        else page.find('.full-start-new__details').append(sloganHtml);
+                    }
+                });
+            }
+
+            function loadSimilars(kp_id) {
+                apiRequest('v2.2/films/' + kp_id + '/similars', function(json) {
+                    if (json && json.items && json.items.length) {
+                        page.find('.items-line__title').filter(function() {
+                            var t = $(this).text().toLowerCase();
+                            return t.indexOf('рекомендуем') !== -1 || t.indexOf('похожи') !== -1 || t.indexOf('связанн') !== -1;
+                        }).closest('.items-line').hide();
+
+                        createSection('kp-similars', 'Похожие (Кинопоиск)');
+                        var itemsBlock = page.find('.kp-similars-items');
+                        
+                        for (var i = 0; i < json.items.length; i++) {
+                            (function () {
+                                var sim = json.items[i];
+                                var name = sim.nameRu || sim.nameEn || sim.nameOriginal;
+                                var poster = sim.posterUrlPreview || 'https://via.placeholder.com/130x195?text=Нет+постера';
+                                var item = $('<div class="selector layer--visible kp-similar-card">' +
+                                                '<img src="' + poster + '" class="kp-similar-poster" />' +
+                                                '<div class="kp-similar-title">' + name + '</div>' +
+                                            '</div>');
+                                
+                                item.on('hover:enter', function() {
+                                    Lampa.Noty.show('Загрузка...');
+                                    apiRequest('v2.2/films/' + sim.filmId, function(details) {
+                                        if (details && details.imdbId) {
+                                            Lampa.Activity.push({ url: '', component: 'full', id: details.imdbId, method: isTvShow ? 'tv' : 'movie', source: 'imdb' });
+                                        } else {
+                                            Lampa.Activity.push({ component: 'search', query: name });
+                                        }
+                                    });
+                                });
+                                itemsBlock.append(item);
+                            })();
+                        }
+                    }
+                });
+            }
+
+            function loadFactsAndBloopers(kp_id) {
+                apiRequest('v2.2/films/' + kp_id + '/facts', function(json) {
+                    if (json && json.items && json.items.length) {
+                        var facts = [];
+                        var bloopers = [];
+                        for (var i = 0; i < json.items.length; i++) {
+                            if (json.items[i].type === 'FACT') facts.push(json.items[i]);
+                            if (json.items[i].type === 'BLOOPER') bloopers.push(json.items[i]);
+                        }
+
+                        function renderBlocks(dataList, containerClass, title, modalTitle) {
+                            if (!dataList.length) return;
+                            createSection(containerClass, title);
+                            var itemsBlock = page.find('.' + containerClass + '-items');
+                            
+                            var fullTextHtml = '';
+                            for (var j = 0; j < dataList.length; j++) {
+                                var clean = dataList[j].text.replace(/<[^>]+>/g, '');
+                                var spoiler = dataList[j].spoiler ? '<span class="kp-spoiler">[СПОЙЛЕР]</span>' : '';
+                                fullTextHtml += spoiler + clean + '<br><hr>';
+                            }
+
+                            for (var k = 0; k < dataList.length; k++) {
+                                (function () {
+                                    var clean = dataList[k].text.replace(/<[^>]+>/g, '');
+                                    var spoiler = dataList[k].spoiler ? '<span class="kp-spoiler">СПОЙЛЕР</span>' : '';
+                                    var preview = clean.length > 150 ? clean.substring(0, 150) + '...' : clean;
+                                    
+                                    var item = $('<div class="selector layer--visible kp-review-card">' +
+                                                    '<div style="font-size: 0.95em; line-height: 1.4; white-space: normal;">' + spoiler + preview + '</div>' +
+                                                '</div>');
+                                    
+                                    item.on('hover:enter', function() {
+                                        Lampa.Modal.open({
+                                            title: modalTitle,
+                                            html: $('<div class="broadcast__text kp-modal-text"><div>' + fullTextHtml + '</div></div>'),
+                                            size: "large", mask: true, onBack: function() { Lampa.Modal.close(); }
+                                        });
+                                    });
+                                    itemsBlock.append(item);
+                                })();
+                            }
+                        }
+
+                        renderBlocks(facts, 'kp-facts', 'Знаете ли вы, что...', 'Интересные факты');
+                        renderBlocks(bloopers, 'kp-bloopers', 'Ошибки в ' + (isTvShow ? 'сериале' : 'фильме'), 'Киноляпы');
+                    }
+                });
+            }
+
+            function loadAwards(kp_id) {
+                apiRequest('v2.2/films/' + kp_id + '/awards', function(json) {
+                    if (json && json.items && json.items.length) {
+                        createSection('kp-awards', 'Награды');
+                        var itemsBlock = page.find('.kp-awards-items');
+                        for (var i = 0; i < json.items.length; i++) {
+                            var a = json.items[i];
+                            var status = a.win ? '<span style="color:#79D29E; font-weight:bold;">🏆 Победа</span>' : '<span style="color:#bbb;">⭐ Номинация</span>';
+                            itemsBlock.append($('<div class="selector layer--visible kp-review-card" style="min-width: 240px;">' +
+                                    '<div style="line-height: 1.4; white-space: normal;">' + status + '<br><b style="color:#fff;">' + a.name + ' (' + a.year + ')</b><br><span style="color:#aaa; font-size: 0.9em;">' + a.nominationName + '</span></div>' +
+                                '</div>'));
+                        }
+                    }
+                });
+            }
+
+            function loadImages(kp_id, type, title, containerClass) {
+                apiRequest('v2.2/films/' + kp_id + '/images?type=' + type + '&page=1', function(json) {
+                    if (json && json.items && json.items.length) {
+                        createSection(containerClass, title);
+                        var itemsBlock = page.find('.' + containerClass + '-items');
+                        for (var i = 0; i < json.items.length; i++) {
+                            (function () {
+                                var img = json.items[i];
+                                var item = $('<div class="selector layer--visible kp-image-card" style="background-image: url(\'' + img.previewUrl + '\');"></div>');
+                                item.on('hover:enter', function() {
+                                    Lampa.Modal.open({ 
+                                        title: title, 
+                                        html: $('<div style="text-align:center; padding: 20px;"><img src="' + img.imageUrl + '" style="max-width:100%; max-height:80vh; border-radius:12px; box-shadow: 0 10px 30px rgba(0,0,0,0.7);"></div>'), 
+                                        size: "large", mask: true, onBack: function() { Lampa.Modal.close(); } 
+                                    });
+                                });
+                                itemsBlock.append(item);
+                            })();
+                        }
+                    }
+                });
+            }
+
+            function startFetching(kp_id) {
+                loadMainInfo(kp_id);
+                loadFactsAndBloopers(kp_id);
+                loadSimilars(kp_id);
+                loadAwards(kp_id);
+                loadImages(kp_id, 'STILL', 'Кадры', 'kp-stills');
+                loadImages(kp_id, 'POSTER', 'Постеры', 'kp-posters');
+            }
+
+            var kpid = e.data.movie.kinopoisk_id || e.data.movie.kp_id || e.data.movie.id_kp;
+            if (kpid) {
+                startFetching(kpid);
+            } else {
+                var query = encodeURIComponent(movieTitle + (movieYear ? ' ' + movieYear : ''));
+                apiRequest('v2.1/films/search-by-keyword?keyword=' + query, function(searchJson) {
+                    if (searchJson && searchJson.films && searchJson.films.length) {
+                        startFetching(searchJson.films[0].filmId);
+                    }
+                });
+            }
+        });
+    }
+
+    if (window.Lampa) startPlugin();
+    else if (window.LampaListener) window.LampaListener.follow("app", function(e) { if (e.type === "ready") startPlugin(); });
+})();
+
                                         Lampa.Activity.push({ url: '', component: 'full', id: details.imdbId, method: isTvShow ? 'tv' : 'movie', source: 'imdb' });
                                     } else {
                                         Lampa.Activity.push({ component: 'search', query: name });
@@ -1580,56 +1818,3 @@
 
             function loadImages(kp_id, type, title, containerClass) {
                 apiRequest('v2.2/films/' + kp_id + '/images?type=' + type + '&page=1', function(json) {
-                    if (json && json.items && json.items.length) {
-                        createSection(containerClass, title);
-                        var itemsBlock = page.find('.' + containerClass + '-items');
-                        json.items.forEach(function(img) {
-                            var item = $('<div class="selector layer--visible kp-image-card" style="margin-right: 15px; background: url(\'' + img.previewUrl + '\') center/cover no-repeat;"></div>');
-                            item.on('hover:enter', function() {
-                                Lampa.Modal.open({ 
-                                    title: title, 
-                                    html: $('<div style="text-align:center; padding: 20px;"><img src="' + img.imageUrl + '" style="max-width:100%; max-height:80vh; border-radius:12px; box-shadow: 0 10px 30px rgba(0,0,0,0.7);"></div>'), 
-                                    size: "large", mask: true, onBack: function() { Lampa.Modal.close(); } 
-                                });
-                            });
-                            itemsBlock.append(item);
-                        });
-                    }
-                });
-            }
-
-            function startFetching(kp_id) {
-                Lampa.Noty.show('Данные Кинопоиска загружаются...');
-                if (getSetting('kp_show_slogan')) loadMainInfo(kp_id);
-                if (getSetting('kp_show_facts') || getSetting('kp_show_bloopers')) loadFactsAndBloopers(kp_id);
-                if (getSetting('kp_show_similars')) loadSimilars(kp_id);
-                if (getSetting('kp_show_awards')) loadAwards(kp_id);
-                if (getSetting('kp_show_stills')) loadImages(kp_id, 'STILL', 'Кадры', 'kp-stills');
-                if (getSetting('kp_show_posters')) loadImages(kp_id, 'POSTER', 'Постеры', 'kp-posters');
-            }
-
-            var kpid = e.data.movie.kinopoisk_id || e.data.movie.kp_id || e.data.movie.id_kp;
-            if (kpid) {
-                startFetching(kpid);
-            } else {
-                var query = encodeURIComponent(movieTitle + (movieYear ? ' ' + movieYear : ''));
-                apiRequest('v2.1/films/search-by-keyword?keyword=' + query, function(searchJson) {
-                    if (searchJson && searchJson.films && searchJson.films.length) {
-                        startFetching(searchJson.films[0].filmId);
-                    }
-                });
-            }
-        });
-    }
-
-    if (window.Lampa) startPlugin();
-    else {
-        if (window.LampaListener) {
-            window.LampaListener.follow("app", function(e) {
-                if (e.type === "ready") startPlugin();
-            });
-        } else {
-            setTimeout(startPlugin, 1000);
-        }
-    }
-})();
